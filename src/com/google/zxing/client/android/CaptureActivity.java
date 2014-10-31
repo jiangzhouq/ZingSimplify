@@ -58,13 +58,11 @@ import com.google.zxing.Result;
 import com.google.zxing.ResultMetadataType;
 import com.google.zxing.ResultPoint;
 import com.google.zxing.client.android.camera.CameraManager;
-import com.google.zxing.client.android.history.HistoryActivity;
-import com.google.zxing.client.android.history.HistoryItem;
-import com.google.zxing.client.android.history.HistoryManager;
 import com.google.zxing.client.android.result.ResultButtonListener;
 import com.google.zxing.client.android.result.ResultHandler;
 import com.google.zxing.client.android.result.ResultHandlerFactory;
 import com.google.zxing.client.android.result.supplement.SupplementalInfoRetriever;
+import com.google.zxing.client.result.ISBNParsedResult;
 
 /**
  * This activity opens the camera and does the actual scanning on a background thread. It draws a
@@ -106,7 +104,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
   private Collection<BarcodeFormat> decodeFormats;
   private Map<DecodeHintType,?> decodeHints;
   private String characterSet;
-  private HistoryManager historyManager;
   private InactivityTimer inactivityTimer;
   private BeepManager beepManager;
   private AmbientLightManager ambientLightManager;
@@ -132,8 +129,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     setContentView(R.layout.capture);
 
     hasSurface = false;
-    historyManager = new HistoryManager(this);
-    historyManager.trimHistory();
     inactivityTimer = new InactivityTimer(this);
     beepManager = new BeepManager(this);
     ambientLightManager = new AmbientLightManager(this);
@@ -321,10 +316,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     Intent intent = new Intent(Intent.ACTION_VIEW);
     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
     switch (item.getItemId()) {
-      case R.id.menu_history:
-        intent.setClassName(this, HistoryActivity.class.getName());
-        startActivityForResult(intent, HISTORY_REQUEST_CODE);
-        break;
       case R.id.menu_settings:
         intent.setClassName(this, PreferencesActivity.class.getName());
         startActivity(intent);
@@ -337,19 +328,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         return super.onOptionsItemSelected(item);
     }
     return true;
-  }
-
-  @Override
-  public void onActivityResult(int requestCode, int resultCode, Intent intent) {
-    if (resultCode == RESULT_OK) {
-      if (requestCode == HISTORY_REQUEST_CODE) {
-        int itemNumber = intent.getIntExtra(Intents.History.ITEM_NUMBER, -1);
-        if (itemNumber >= 0) {
-          HistoryItem historyItem = historyManager.buildHistoryItem(itemNumber);
-          decodeOrStoreSavedBitmap(null, historyItem.getResult());
-        }
-      }
-    }
   }
 
   private void decodeOrStoreSavedBitmap(Bitmap bitmap, Result result) {
@@ -400,15 +378,17 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     inactivityTimer.onActivity();
     lastResult = rawResult;
     ResultHandler resultHandler = ResultHandlerFactory.makeResultHandler(this, rawResult);
-
+    if(null == resultHandler){
+    	Log.d("qiqi", "not valid code");
+    	return;
+    }
     boolean fromLiveScan = barcode != null;
     if (fromLiveScan) {
-      historyManager.addHistoryItem(rawResult, resultHandler);
       // Then not from history, so beep/vibrate and we have an image to draw on
       beepManager.playBeepSoundAndVibrate();
       drawResultPoints(barcode, scaleFactor, rawResult);
     }
-
+    Log.d("qiqi", "source:" + source);
     switch (source) {
       case NATIVE_APP_INTENT:
       case PRODUCT_SEARCH_LINK:
@@ -481,7 +461,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
 
   // Put up our own UI for how to handle the decoded contents.
   private void handleDecodeInternally(Result rawResult, ResultHandler resultHandler, Bitmap barcode) {
-
     CharSequence displayContents = resultHandler.getDisplayContents();
 
     SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -505,14 +484,16 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
 
     TextView formatTextView = (TextView) findViewById(R.id.format_text_view);
     formatTextView.setText(rawResult.getBarcodeFormat().toString());
-
+    Log.d("qiqi", "formatTextView:" + rawResult.getBarcodeFormat().toString());
+    
     TextView typeTextView = (TextView) findViewById(R.id.type_text_view);
     typeTextView.setText(resultHandler.getType().toString());
-
+    Log.d("qiqi", "typeTextView:" + resultHandler.getType().toString());
+    
     DateFormat formatter = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
     TextView timeTextView = (TextView) findViewById(R.id.time_text_view);
     timeTextView.setText(formatter.format(new Date(rawResult.getTimestamp())));
-
+    Log.d("qiqi", "timeTextView:" + formatter.format(new Date(rawResult.getTimestamp())));
 
     TextView metaTextView = (TextView) findViewById(R.id.meta_text_view);
     View metaTextViewLabel = findViewById(R.id.meta_text_view_label);
@@ -529,6 +510,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
       if (metadataText.length() > 0) {
         metadataText.setLength(metadataText.length() - 1);
         metaTextView.setText(metadataText);
+        Log.d("qiqi", "metaTextView:" + metadataText);
         metaTextView.setVisibility(View.VISIBLE);
         metaTextViewLabel.setVisibility(View.VISIBLE);
       }
@@ -536,6 +518,7 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
 
     TextView contentsTextView = (TextView) findViewById(R.id.contents_text_view);
     contentsTextView.setText(displayContents);
+    Log.d("qiqi", "contentsTextView:" + displayContents);
     int scaledSize = Math.max(22, 32 - displayContents.length() / 4);
     contentsTextView.setTextSize(TypedValue.COMPLEX_UNIT_SP, scaledSize);
 
@@ -546,10 +529,9 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         PreferencesActivity.KEY_SUPPLEMENTAL, true)) {
       SupplementalInfoRetriever.maybeInvokeRetrieval(supplementTextView,
                                                      resultHandler.getResult(),
-                                                     historyManager,
                                                      this);
     }
-
+    Log.d("qiqi", "supplementTextView:" + supplementTextView.getText());
     int buttonCount = resultHandler.getButtonCount();
     ViewGroup buttonView = (ViewGroup) findViewById(R.id.result_button_view);
     buttonView.requestFocus();

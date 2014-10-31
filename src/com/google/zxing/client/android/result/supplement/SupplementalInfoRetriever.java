@@ -31,7 +31,6 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import com.google.zxing.client.android.history.HistoryManager;
 import com.google.zxing.client.result.ISBNParsedResult;
 import com.google.zxing.client.result.ParsedResult;
 import com.google.zxing.client.result.ProductParsedResult;
@@ -43,24 +42,21 @@ public abstract class SupplementalInfoRetriever extends AsyncTask<Object,Object,
 
   public static void maybeInvokeRetrieval(TextView textView,
                                           ParsedResult result,
-                                          HistoryManager historyManager,
                                           Context context) {
 	  if (result instanceof ISBNParsedResult) {
       String isbn = ((ISBNParsedResult) result).getISBN();
       SupplementalInfoRetriever bookInfoRetriever = 
-          new BookResultInfoRetriever(textView, isbn, historyManager, context);
+          new BookResultInfoRetriever(textView, isbn, context);
       bookInfoRetriever.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
   }
 
   private final WeakReference<TextView> textViewRef;
-  private final WeakReference<HistoryManager> historyManagerRef;
   private final Collection<Spannable> newContents;
   private final Collection<String[]> newHistories;
 
-  SupplementalInfoRetriever(TextView textView, HistoryManager historyManager) {
+  SupplementalInfoRetriever(TextView textView) {
     textViewRef = new WeakReference<>(textView);
-    historyManagerRef = new WeakReference<>(historyManager);
     newContents = new ArrayList<>();
     newHistories = new ArrayList<>();
   }
@@ -83,12 +79,6 @@ public abstract class SupplementalInfoRetriever extends AsyncTask<Object,Object,
         textView.append(content);
       }
       textView.setMovementMethod(LinkMovementMethod.getInstance());
-    }
-    HistoryManager historyManager = historyManagerRef.get();
-    if (historyManager != null) {
-      for (String[] text : newHistories) {
-        historyManager.addHistoryItemDetails(text[0], text[1]);
-      }
     }
   }
 
