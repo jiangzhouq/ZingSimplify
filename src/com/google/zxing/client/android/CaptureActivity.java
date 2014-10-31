@@ -16,25 +16,17 @@
 
 package com.google.zxing.client.android;
 
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.DecodeHintType;
-import com.google.zxing.Result;
-import com.google.zxing.ResultMetadataType;
-import com.google.zxing.ResultPoint;
-import com.google.zxing.client.android.camera.CameraManager;
-import com.google.zxing.client.android.history.HistoryActivity;
-import com.google.zxing.client.android.history.HistoryItem;
-import com.google.zxing.client.android.history.HistoryManager;
-import com.google.zxing.client.android.result.ResultButtonListener;
-import com.google.zxing.client.android.result.ResultHandler;
-import com.google.zxing.client.android.result.ResultHandlerFactory;
-import com.google.zxing.client.android.result.supplement.SupplementalInfoRetriever;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.util.Collection;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.Map;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -50,7 +42,6 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -61,12 +52,19 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.IOException;
-import java.text.DateFormat;
-import java.util.Collection;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.Map;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.DecodeHintType;
+import com.google.zxing.Result;
+import com.google.zxing.ResultMetadataType;
+import com.google.zxing.ResultPoint;
+import com.google.zxing.client.android.camera.CameraManager;
+import com.google.zxing.client.android.history.HistoryActivity;
+import com.google.zxing.client.android.history.HistoryItem;
+import com.google.zxing.client.android.history.HistoryManager;
+import com.google.zxing.client.android.result.ResultButtonListener;
+import com.google.zxing.client.android.result.ResultHandler;
+import com.google.zxing.client.android.result.ResultHandlerFactory;
+import com.google.zxing.client.android.result.supplement.SupplementalInfoRetriever;
 
 /**
  * This activity opens the camera and does the actual scanning on a background thread. It draws a
@@ -162,14 +160,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     handler = null;
     lastResult = null;
 
-    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-
-    if (prefs.getBoolean(PreferencesActivity.KEY_DISABLE_AUTO_ORIENTATION, true)) {
-      setRequestedOrientation(getCurrentOrientation());
-    } else {
-      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-    }
-
     resetStatusView();
 
     SurfaceView surfaceView = (SurfaceView) findViewById(R.id.preview_view);
@@ -189,9 +179,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     inactivityTimer.onResume();
 
     Intent intent = getIntent();
-
-    copyToClipboard = prefs.getBoolean(PreferencesActivity.KEY_COPY_TO_CLIPBOARD, true)
-        && (intent == null || intent.getBooleanExtra(Intents.Scan.SAVE_HISTORY, true));
 
     source = IntentSource.NONE;
     decodeFormats = null;
@@ -257,17 +244,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
     }
   }
 
-  private int getCurrentOrientation() {
-    int rotation = getWindowManager().getDefaultDisplay().getRotation();
-    switch (rotation) {
-      case Surface.ROTATION_0:
-      case Surface.ROTATION_90:
-        return ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
-      default:
-        return ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
-    }
-  }
-  
   private static boolean isZXingURL(String dataString) {
     if (dataString == null) {
       return false;
@@ -630,10 +606,6 @@ public final class CaptureActivity extends Activity implements SurfaceHolder.Cal
         if (metadata.containsKey(ResultMetadataType.UPC_EAN_EXTENSION)) {
           intent.putExtra(Intents.Scan.RESULT_UPC_EAN_EXTENSION,
                           metadata.get(ResultMetadataType.UPC_EAN_EXTENSION).toString());
-        }
-        Number orientation = (Number) metadata.get(ResultMetadataType.ORIENTATION);
-        if (orientation != null) {
-          intent.putExtra(Intents.Scan.RESULT_ORIENTATION, orientation.intValue());
         }
         String ecLevel = (String) metadata.get(ResultMetadataType.ERROR_CORRECTION_LEVEL);
         if (ecLevel != null) {

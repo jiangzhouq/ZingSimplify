@@ -54,7 +54,17 @@ final class CameraConfigurationManager {
     display.getSize(theScreenResolution);
     screenResolution = theScreenResolution;
     Log.i(TAG, "Screen resolution: " + screenResolution);
-    cameraResolution = CameraConfigurationUtils.findBestPreviewSizeValue(parameters, screenResolution);
+  //为竖屏添加
+    Point screenResolutionForCamera = new Point();
+    screenResolutionForCamera.x = screenResolution.x;
+    screenResolutionForCamera.y = screenResolution.y;
+    if (screenResolution.x < screenResolution.y) {
+        screenResolutionForCamera.x = screenResolution.y;
+        screenResolutionForCamera.y = screenResolution.x;
+    }
+    // 下句第二参数要根据竖屏修改
+    cameraResolution = CameraConfigurationUtils.findBestPreviewSizeValue(parameters, screenResolutionForCamera);
+//    cameraResolution = CameraConfigurationUtils.findBestPreviewSizeValue(parameters, screenResolution);
     Log.i(TAG, "Camera resolution: " + cameraResolution);
   }
 
@@ -99,10 +109,10 @@ final class CameraConfigurationManager {
 
     }
 
+    camera.setDisplayOrientation(90);
     parameters.setPreviewSize(cameraResolution.x, cameraResolution.y);
 
     Log.i(TAG, "Final camera parameters: " + parameters.flatten());
-
     camera.setParameters(parameters);
 
     Camera.Parameters afterParameters = camera.getParameters();
