@@ -50,18 +50,18 @@ public final class EmailAddressResultHandler extends ResultHandler {
   @Override
   public void handleButtonPress(int index) {
     EmailAddressParsedResult emailResult = (EmailAddressParsedResult) getResult();
-    switch (index) {
-      case 0:
-        sendEmail(emailResult.getTos(),
-                  emailResult.getCCs(),
-                  emailResult.getBCCs(),
-                  emailResult.getSubject(),
-                  emailResult.getBody());
-        break;
-      case 1:
-        addEmailOnlyContact(emailResult.getTos(), null);
-        break;
-    }
+//    switch (index) {
+//      case 0:
+//        sendEmail(emailResult.getTos(),
+//                  emailResult.getCCs(),
+//                  emailResult.getBCCs(),
+//                  emailResult.getSubject(),
+//                  emailResult.getBody());
+//        break;
+//      case 1:
+//        addEmailOnlyContact(emailResult.getTos(), null);
+//        break;
+//    }
   }
 
   @Override
