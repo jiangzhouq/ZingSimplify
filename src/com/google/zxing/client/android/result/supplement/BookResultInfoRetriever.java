@@ -21,15 +21,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 import android.content.Context;
+import android.util.Log;
 import android.widget.TextView;
+
 import com.google.zxing.client.android.HttpHelper;
 import com.google.zxing.client.android.LocaleManager;
 import com.google.zxing.client.android.R;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-
 
 /**
  * @author Kamil Kaczmarczyk
@@ -37,68 +39,71 @@ import org.json.JSONTokener;
  */
 final class BookResultInfoRetriever extends SupplementalInfoRetriever {
 
-  private final String isbn;
-  private final String source;
-  private final Context context;
-  
-  BookResultInfoRetriever(TextView textView, String isbn,  Context context) {
-    super(textView);
-    this.isbn = isbn;
-    this.source = context.getString(R.string.msg_google_books);
-    this.context = context;
-  }
+	private final String isbn;
+	private final String source;
+	private final Context context;
 
-  @Override
-  void retrieveSupplementalInfo() throws IOException {
+	BookResultInfoRetriever(TextView textView, String isbn, Context context) {
+		super(textView);
+		this.isbn = isbn;
+		this.source = context.getString(R.string.msg_google_books);
+		this.context = context;
+	}
 
-    CharSequence contents = HttpHelper.downloadViaHttp("https://www.googleapis.com/books/v1/volumes?q=isbn:" + isbn,
-                                                       HttpHelper.ContentType.JSON);
+	@Override
+	void retrieveSupplementalInfo() throws IOException {
 
-    if (contents.length() == 0) {
-      return;
-    }
+		CharSequence contents = HttpHelper.downloadViaHttp(
+				"https://api.douban.com/v2/book/isbn/:" + isbn,
+				HttpHelper.ContentType.JSON);
 
-    String title;
-    String pages;
-    Collection<String> authors = null;
+		if (contents.length() == 0) {
+			return;
+		}
 
-    try {
+		String average;
+		String imageUrl;
+		Collection<String> authors = null;
 
-      JSONObject topLevel = (JSONObject) new JSONTokener(contents.toString()).nextValue();
-      JSONArray items = topLevel.optJSONArray("items");
-      if (items == null || items.isNull(0)) {
-        return;
-      }
+		try {
 
-      JSONObject volumeInfo = ((JSONObject) items.get(0)).getJSONObject("volumeInfo");
-      if (volumeInfo == null) {
-        return;
-      }
+			JSONObject topLevel = (JSONObject) new JSONTokener(
+					contents.toString()).nextValue();
+			// title
+			Log.d("qiqi", "title:" + topLevel.getString("title"));
+			// author
+			JSONArray authorsArray = topLevel.optJSONArray("author");
+			if (authorsArray != null && !authorsArray.isNull(0)) {
+				authors = new ArrayList<>(authorsArray.length());
+				for (int i = 0; i < authorsArray.length(); i++) {
+					authors.add(authorsArray.getString(i));
+				}
+			}
+			Log.d("qiqi", "authors:" + authors);
+			//rating
+			JSONObject ratingInfo = ((JSONObject) topLevel.getJSONObject("rating"));
+			average = ratingInfo.getString("average");
+			Log.d("qiqi", "average:" + average);
+			//publisher
+			Log.d("qiqi", "publisher:" + topLevel.getString("publisher"));
+			//image
+			JSONObject iamgesInfo = ((JSONObject) topLevel.getJSONObject("images"));
+			imageUrl = iamgesInfo.getString("small");
+			Log.d("qiqi", "imageUrl:" + imageUrl);
+		} catch (JSONException e) {
+			throw new IOException(e);
+		}
 
-      title = volumeInfo.optString("title");
-      pages = volumeInfo.optString("pageCount");
+		Collection<String> newTexts = new ArrayList<>();
+		maybeAddText(average, newTexts);
+		maybeAddTextSeries(authors, newTexts);
 
-      JSONArray authorsArray = volumeInfo.optJSONArray("authors");
-      if (authorsArray != null && !authorsArray.isNull(0)) {
-        authors = new ArrayList<>(authorsArray.length());
-        for (int i = 0; i < authorsArray.length(); i++) {
-          authors.add(authorsArray.getString(i));
-        }
-      }
+		String baseBookUri = "http://www.google."
+				+ LocaleManager.getBookSearchCountryTLD(context)
+				+ "/search?tbm=bks&source=zxing&q=";
 
-    } catch (JSONException e) {
-      throw new IOException(e);
-    }
-
-    Collection<String> newTexts = new ArrayList<>();
-    maybeAddText(title, newTexts);
-    maybeAddTextSeries(authors, newTexts);
-    maybeAddText(pages == null || pages.isEmpty() ? null : pages + "pp.", newTexts);
-    
-    String baseBookUri = "http://www.google." + LocaleManager.getBookSearchCountryTLD(context)
-        + "/search?tbm=bks&source=zxing&q=";
-
-    append(isbn, source, newTexts.toArray(new String[newTexts.size()]), baseBookUri + isbn);
-  }
+		append(isbn, source, newTexts.toArray(new String[newTexts.size()]),
+				baseBookUri + isbn);
+	}
 
 }
